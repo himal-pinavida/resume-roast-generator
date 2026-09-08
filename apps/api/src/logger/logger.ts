@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import pino, { type Logger } from "pino";
 import { pinoHttp } from "pino-http";
+import { safeErrorSerializer } from "./error-serializer.js";
 
 /**
  * Structured logging baseline. Pino emits JSON with a stable `service`/`environment` base and a
@@ -30,6 +31,9 @@ export function createLogger(options: LoggerOptions = {}): Logger {
         "secret",
       ],
       censor: "[REDACTED]",
+    },
+    serializers: {
+      err: safeErrorSerializer,
     },
   });
 }
@@ -61,6 +65,7 @@ export function createRequestLoggerMiddleware(logger: Logger) {
     },
     serializers: {
       req: minimalRequestSerializer,
+      err: safeErrorSerializer,
     },
     customProps: (req) => {
       const id = (req as IncomingMessage & { id?: unknown }).id;

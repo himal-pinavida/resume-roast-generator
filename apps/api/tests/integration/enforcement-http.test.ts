@@ -221,4 +221,29 @@ describe("PII negatives", () => {
       expect(serialized).not.toContain(`"${forbiddenField}"`);
     }
   });
+
+  it("never logs the raw request body when JSON parsing fails", async () => {
+    const { app, logs } = createHarness();
+    const rawBody =
+      '{"resumeText":"John Doe 555-123 203.0.113.10","captchaToken":"captcha-token-xyz"} BAD';
+
+    const response = await request(app)
+      .post("/api/resume/roast")
+      .set("Content-Type", "application/json")
+      .send(rawBody)
+      .expect(500);
+
+    expect(response.body.error.code).toBe("internal:server_error");
+
+    const serialized = JSON.stringify(logs);
+    for (const forbidden of [
+      "John Doe",
+      "555-123",
+      "203.0.113.10",
+      "captcha-token-xyz",
+      "resumeText",
+    ]) {
+      expect(serialized).not.toContain(forbidden);
+    }
+  });
 });

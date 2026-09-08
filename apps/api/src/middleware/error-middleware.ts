@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { DomainError } from "../errors/domain-errors.js";
+import { summarizeError } from "../logger/error-serializer.js";
 
 /**
  * The ONE place typed domain errors map to HTTP responses. The Story 56 envelope is
@@ -33,9 +34,15 @@ export function errorMiddleware(
   }
 
   if (req.log) {
-    req.log.error({ err }, `Unhandled error for ${req.method} ${req.path}`);
+    req.log.error(
+      { err: summarizeError(err) },
+      `Unhandled error for ${req.method} ${req.path}`,
+    );
   } else {
-    console.error(`Unhandled error for ${req.method} ${req.path}:`, err);
+    console.error(
+      `Unhandled error for ${req.method} ${req.path}:`,
+      summarizeError(err),
+    );
   }
 
   res.status(500).json({
