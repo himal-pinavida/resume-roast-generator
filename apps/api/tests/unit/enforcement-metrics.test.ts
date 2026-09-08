@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Logger } from "pino";
+import pino from "pino";
 import { Registry } from "prom-client";
 import {
   createEnforcementMetrics,
@@ -10,6 +11,7 @@ import {
   EnforcementOutcome,
   EnforcementType,
 } from "../../src/observability/enforcement-events.js";
+import { safeErrorSerializer } from "../../src/logger/error-serializer.js";
 import { RecordingLogger } from "../helpers/recording-logger.js";
 
 async function samplesNamed(registry: Registry, name: string) {
@@ -116,6 +118,57 @@ describe("PromEnforcementMetrics", () => {
     expect(JSON.stringify(failures[0].payload)).not.toContain("captcha-token-xyz");
     expect(JSON.stringify(failures[0].payload)).not.toContain("John Doe");
     expect(JSON.stringify(failures[0].payload)).not.toContain("resumeText");
+  });
+
+  it("emits the throttled failure through a real Pino logger with only the safe err summary", () => {
+    const records: string[] = [];
+    const stream = {
+      write(chunk: string): boolean {
+        records.push(chunk);
+        return true;
+      },
+    };
+    const logger = pino(
+      {
+        level: "info",
+        base: {},
+        serializers: { err: safeErrorSerializer },
+      },
+      stream as unknown as Parameters<typeof pino>[1],
+    );
+
+    const registry = new Registry();
+    const metrics = createEnforcementMetrics(registry, logger);
+    const internal = metrics as unknown as { triggers: { inc: () => void } };
+    const backendError = Object.assign(new Error("metrics backend unavailable"), {
+      token: "captcha-token-xyz",
+      body: '{"resumeText":"John Doe 555-123"}',
+    });
+    internal.triggers.inc = () => {
+      throw backendError;
+    };
+
+    expect(() =>
+      metrics.recordEnforcement({
+        type: EnforcementType.RateLimit,
+        action: EnforcementAction.Triggered,
+        outcome: EnforcementOutcome.Blocked,
+      }),
+    ).not.toThrow();
+
+    expect(records).toHaveLength(1);
+    const logged = JSON.parse(records[0]) as Record<string, unknown>;
+    expect(logged.msg).toBe("Failed to record enforcement metrics");
+    expect(logged.err).toEqual({
+      type: "Error",
+      message: "metrics backend unavailable",
+      stack: backendError.stack,
+    });
+    expect(records[0]).not.toContain("captcha-token-xyz");
+    expect(records[0]).not.toContain("John Doe");
+    expect(records[0]).not.toContain("resumeText");
+    expect(records[0]).not.toContain('"token"');
+    expect(records[0]).not.toContain('"body"');
   });
 
   it("supports the optional enforcement decision latency histogram", async () => {
