@@ -7,6 +7,7 @@ import type {
   QuotaState,
 } from "./enforcement-events.js";
 import { EnforcementType as EnforcementTypeValue } from "./enforcement-events.js";
+import { summarizeError } from "../logger/error-serializer.js";
 
 /**
  * Enforcement counter families (ADR 0002). Label values are constrained to the bounded enums from
@@ -100,9 +101,9 @@ export class PromEnforcementMetrics implements EnforcementMetrics {
     this.lastFailureLogAt = now;
     const message = "Failed to record enforcement metrics";
     if (this.logger) {
-      this.logger.error({ error }, message);
+      this.logger.error({ err: summarizeError(error) }, message);
     } else {
-      console.error(message, error);
+      console.error(message, summarizeError(error));
     }
   }
 }

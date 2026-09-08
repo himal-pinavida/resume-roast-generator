@@ -76,14 +76,18 @@ describe("PromEnforcementMetrics", () => {
     expect(text).toContain("quota_state_changes_total");
   });
 
-  it("never propagates a throwing metrics backend and throttles failure logs", () => {
+  it("never propagates a throwing metrics backend, throttles failure logs, and strips PII from failures", () => {
     const registry = new Registry();
     const logger = new RecordingLogger();
     const metrics = createEnforcementMetrics(registry, logger as unknown as Logger);
 
     const internal = metrics as unknown as { triggers: { inc: () => void } };
+    const backendError = Object.assign(new Error("metrics backend unavailable"), {
+      token: "captcha-token-xyz",
+      body: '{"resumeText":"John Doe 555-123"}',
+    });
     internal.triggers.inc = () => {
-      throw new Error("metrics backend unavailable");
+      throw backendError;
     };
 
     expect(() =>
@@ -103,6 +107,15 @@ describe("PromEnforcementMetrics", () => {
 
     const failures = logger.records.filter((record) => record.level === "error");
     expect(failures).toHaveLength(1);
+    expect(failures[0].payload.error).toBeUndefined();
+    expect(failures[0].payload.err).toEqual({
+      type: "Error",
+      message: "metrics backend unavailable",
+      stack: backendError.stack,
+    });
+    expect(JSON.stringify(failures[0].payload)).not.toContain("captcha-token-xyz");
+    expect(JSON.stringify(failures[0].payload)).not.toContain("John Doe");
+    expect(JSON.stringify(failures[0].payload)).not.toContain("resumeText");
   });
 
   it("supports the optional enforcement decision latency histogram", async () => {
