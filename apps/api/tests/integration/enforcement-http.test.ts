@@ -1,6 +1,6 @@
 import request from "supertest";
 import { Registry } from "prom-client";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { createEnforcementMetrics } from "../../src/observability/enforcement-metrics.js";
 import { EnforcementEventNames } from "../../src/observability/enforcement-events.js";
@@ -49,6 +49,35 @@ describe("GET /metrics", () => {
   it("is not mounted when metrics are disabled", async () => {
     const { app } = createHarness({ metricsEnabled: false });
     await request(app).get("/metrics").expect(404);
+  });
+
+  it("routes a failing metrics collector through the error middleware", async () => {
+    const capture = createCapturingPinoLogger();
+    const failingRegistry = {
+      metrics: vi.fn().mockRejectedValue(new Error("collector unavailable")),
+    } as unknown as Registry;
+    const store = new InMemoryEnforcementStore();
+    const app = buildApp({
+      logger: capture.logger,
+      metrics: createEnforcementMetrics(new Registry(), capture.logger),
+      store,
+      registry: failingRegistry,
+      subjectHash: createSubjectHasher("test-key"),
+      environment: "test",
+      service: "resume-roast-api",
+    });
+
+    const response = await request(app).get("/metrics").expect(500);
+
+    expect(response.body.error.code).toBe("internal:server_error");
+    expect(response.body.error.correlationId).toMatch(/^req_/);
+    expect(response.headers["x-request-id"]).toBe(response.body.error.correlationId);
+
+    const errorLogs = capture.records.filter(
+      (record) => record.payload.msg === "Unhandled error for GET /metrics",
+    );
+    expect(errorLogs).toHaveLength(1);
+    expect(JSON.stringify(response.body)).not.toContain("collector unavailable");
   });
 });
 
