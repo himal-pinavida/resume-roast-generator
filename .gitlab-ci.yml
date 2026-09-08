@@ -1,0 +1,16 @@
+stages:
+  - test
+
+api:
+  stage: test
+  image: node:22
+  cache:
+    key: resume-roast-api
+    paths:
+      - apps/api/node_modules/
+  before_script:
+    - cd apps/api
+    - npm ci
+  script:
+    - npm run build
+    - npm test
