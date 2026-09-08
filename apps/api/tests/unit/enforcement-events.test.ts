@@ -64,8 +64,8 @@ describe("logEnforcementEvent", () => {
     expect(record.eventName).toBe(EnforcementEventNames.RateLimitTriggered);
     expect(record.payload.correlationId).toBe(context.correlationId);
     expect(record.payload.requestId).toBe(context.correlationId);
+    expect(record.level).toBe("info");
     expect(record.payload.actor).toBe("anonymous");
-    expect(record.payload.level).toBe("info");
     expect(record.payload.service).toBe(context.service);
     expect(record.payload.environment).toBe(context.environment);
     expect(record.payload.routeId).toBe(context.routeId);

@@ -162,9 +162,10 @@ export type EnforcementEvent =
     };
 
 /**
- * Emit one structured enforcement event. The helper always stamps the common fields and accepts only
- * the typed {@link EnforcementEvent} union above. `requestId` deliberately mirrors `correlationId`
- * because this service has a single request-scoped correlation identifier (Story 89).
+ * Emit one structured enforcement event at info level. The helper always stamps the common fields and
+ * accepts only the typed {@link EnforcementEvent} union above; the injected Pino logger supplies the
+ * structured log's native `level` field. `requestId` deliberately mirrors `correlationId` because this
+ * service has a single request-scoped correlation identifier (Story 89).
  */
 export function logEnforcementEvent(
   logger: Logger,
@@ -177,7 +178,6 @@ export function logEnforcementEvent(
     correlationId: context.correlationId,
     requestId: context.correlationId,
     timestamp: new Date().toISOString(),
-    level: "info",
     actor: "anonymous",
     service: context.service,
     environment: context.environment,

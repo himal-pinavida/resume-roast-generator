@@ -14,9 +14,8 @@ log object.
 
 Use a typed, discriminated-union schema in `apps/api/src/observability/enforcement-events.ts` with
 the seven stable event names as `as const` constants, bounded literal enums for every reason/state
-field, and a `logEnforcementEvent(logger, context, event)` helper that always stamps `eventName`,
-`correlationId`, `requestId` (mirroring `correlationId`), `timestamp`, `level`, and `actor:
-"anonymous"`. Identifiers such as client IPs are hashed with an HMAC-SHA256 key from `PII_HASH_KEY`
+field, and a `logEnforcementEvent(logger, context, event)` helper that logs at info level and always stamps `eventName`,
+`correlationId`, `requestId` (mirroring `correlationId`), `timestamp`, and `actor: "anonymous"`. Identifiers such as client IPs are hashed with an HMAC-SHA256 key from `PII_HASH_KEY`
 and emitted only as `h_<hex>` via `apps/api/src/observability/pii.ts`.
 
 ## Consequences
